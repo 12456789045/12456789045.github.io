@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hk Word Translator</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa5b1;--accent:#38bdf8}
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;min-height:100vh;margin:0;background:linear-gradient(180deg,#071124 0%, #031323 100%);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:24px}
+    .card{width:100%;max-width:880px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:12px;padding:20px;box-shadow:0 8px 30px rgba(2,6,23,0.6);}
+    header{display:flex;align-items:center;gap:12px}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:6px 0 16px;color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+    input[type=text], select, textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button{padding:10px 12px;border-radius:10px;border:none;background:var(--accent);color:#012;cursor:pointer}
+    .controls{display:flex;gap:8px;align-items:center}
+    .result{margin-top:12px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.02);min-height:56px;display:flex;align-items:center;justify-content:space-between}
+    small.muted{color:var(--muted)}
+    .dict-area{margin-top:16px}
+    .dict-list{max-height:160px;overflow:auto;padding:8px;border-radius:8px;background:rgba(0,0,0,0.15)}
+    .dict-item{display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px dashed rgba(255,255,255,0.02)}
+    .muted-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:6px;border-radius:8px}
+    .row{display:flex;gap:8px}
+    @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <header>
+      <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0ea5e9,#06b6d4);display:flex;align-items:center;justify-content:center;font-weight:700;color:#012">TR</div>
+      <div>
+        <h1>HK word Translator</h1>
+        <p class="lead">Translate single words between languages using a large built-in multilingual dictionary with meanings.</p>
+      </div>
+    </header>
+
+    <div style="margin-top:12px" class="grid">
+      <div>
+        <label for="word">Word to translate</label>
+        <input id="word" type="text" placeholder="e.g. hello" />
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="flex:1">
+            <label for="from">From</label>
+            <select id="from"></select>
+          </div>
+          <div style="flex:1">
+            <label for="to">To</label>
+            <select id="to"></select>
+          </div>
+        </div>
+
+        <div class="controls" style="margin-top:12px">
+          <button id="translate">Translate</button>
+          <button id="swap" class="muted-btn">Swap</button>
+          <button id="speak" class="muted-btn">🔊 Speak</button>
+        </div>
+
+        <div class="result" id="result">
+          <div>
+            <div style="font-size:18px" id="translatedText">—</div>
+            <small class="muted" id="confidence">No translation yet</small>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button id="add" class="muted-btn">+ Add to dictionary</button>
+            <button id="clear" class="muted-btn">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label for="newWord">Add / Edit translation</label>
+        <input id="newWord" type="text" placeholder="base word (from language)" />
+        <input id="newTranslation" type="text" placeholder="translation (to language)" style="margin-top:8px" />
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <select id="newFrom"></select>
+          <select id="newTo"></select>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="save" class="muted-btn">Save</button>
+          <button id="deleteEntry" class="muted-btn">Delete</button>
+          <button id="resetDict" class="muted-btn">Reset</button>
+        </div>
+
+        <div class="dict-area">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3 style="margin:0;font-size:14px">Dictionary</h3>
+            <div style="display:flex;gap:8px">
+              <button id="export" class="muted-btn">Export JSON</button>
+              <button id="import" class="muted-btn">Import JSON</button>
+            </div>
+          </div>
+
+          <div class="dict-list" id="dictList" aria-live="polite"></div>
+          <small class="muted">Tip: translations are single-word mappings. Use the Add panel to update the dictionary.</small>
+        </div>
+      </div>
+    </div>
+
+    <footer style="margin-top:14px;display:flex;justify-content:space-between;align-items:center">
+      <small class="muted">Local, offline translator — runs entirely in your browser.</small>
+      <small class="muted">Supports export/import and browser speech synthesis.</small>
+    </footer>
+  </div>
+
+  <script>
+    // Basic languages list
+    const LANGS = [
+      {code:'en',name:'English'},
+      {code:'es',name:'Spanish'},
+      {code:'fr',name:'French'},
+      {code:'hi',name:'Hindi'},
+      {code:'de',name:'German'},
+      {code:'mr',name:'Marathi'}
+    ];
+
+    
+    const SAMPLE = {
+      en: { es: { hello: 'hola', world: 'mundo' }, fr: { hello: 'bonjour' }, hi: { hello: 'नमस्ते' }, mr: { hello: 'नमस्कार' } },
+      es: { en: { hola: 'hello' } },
+      fr: { en: { bonjour: 'hello' } },
+      hi: { en: { नमस्ते: 'hello' } }
+    };
+
+    
+    const $ = id => document.getElementById(id);
+    const fromSel = $('from'), toSel = $('to'), wordInput = $('word'), translateBtn = $('translate');
+    const translatedText = $('translatedText'), confidence = $('confidence');
+
+    function populateLangs() {
+      for (const sel of ['from','to','newFrom','newTo']){
+        const el = $(sel);
+        el.innerHTML = '';
+        LANGS.forEach(l => {
+          const o = document.createElement('option'); o.value = l.code; o.textContent = l.name; el.appendChild(o);
+        });
+      }
+      fromSel.value = 'en'; toSel.value = 'es'; $('newFrom').value = 'en'; $('newTo').value = 'es';
+    }
+
+    
+    async function loadDict(){
+      try {
+        const res = await fetch(`${API}/dictionary`);
+        if (res.ok) {
+          DICT = await res.json();
+          localStorage.setItem('translator_dict', JSON.stringify(DICT));
+          renderDict();
+          return;
+        }
+      } catch (e) {}
+      const raw = localStorage.getItem('translator_dict');
+      if(raw) DICT = JSON.parse(raw);
+      else {
+        DICT = JSON.parse(JSON.stringify(SAMPLE));
+        localStorage.setItem('translator_dict', JSON.stringify(DICT));
+      }
+      renderDict();
+    }
+    let DICT = {};
+
+    function saveDict(){ localStorage.setItem('translator_dict', JSON.stringify(DICT)); renderDict(); }
+
+    async function translate() {
+      const w = wordInput.value.trim();
+      if (!w) {
+        translatedText.textContent = '—';
+        confidence.textContent = 'Enter a word';
+        return;
+      }
+      const from = fromSel.value, to = toSel.value;
+      if (from === to) {
+        translatedText.textContent = w;
+        confidence.textContent = 'Source and target are the same.';
+        return;
+      }
+      const mapping = (DICT[from] && DICT[from][to]) || {};
+      const keys = Object.keys(mapping);
+      const found = keys.find(k => k.toLowerCase() === w.toLowerCase());
+      if (found) {
+        const entry = mapping[found];
+        const value = typeof entry === 'string' ? entry : entry.translation || '';
+        const meaning = typeof entry === 'string' ? '' : entry.meaning || '';
+        translatedText.textContent = value;
+        confidence.textContent = meaning ? `${meaning} (${from}->${to})` : `Found in dictionary (${from}->${to})`;
+        return;
+      }
+
+      // Not found locally, try API
+      translatedText.textContent = '…';
+      confidence.textContent = 'Searching online…';
+      try {
+        const API = "http://127.0.0.1:8000";
+        const res = await fetch(`${API}/translate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ word: w, from_lang: from, to_lang: to })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.translation) {
+            translatedText.textContent = data.translation;
+            confidence.textContent = `Found via API (${from} → ${to})`;
+          } else {
+            translatedText.textContent = "—";
+            confidence.textContent = "No translation found";
+          }
+        } else {
+          translatedText.textContent = "—";
+          confidence.textContent = "No translation found";
+        }
+      } catch (e) {
+        translatedText.textContent = "—";
+        confidence.textContent = "API error";
+      }
+    }
+
+    function renderDict(){
+      const list = $('dictList'); list.innerHTML='';
+      for(const from in DICT){
+        for(const to in DICT[from]){
+          const words = DICT[from][to];
+          for(const w in words){
+            const entry = words[w];
+            const value = typeof entry === 'string' ? entry : entry.translation || '';
+            const meaning = typeof entry === 'string' ? '' : entry.meaning || '';
+            const div = document.createElement('div'); div.className='dict-item';
+            div.innerHTML = `<div><strong>${w}</strong> <small class="muted">(${from} → ${to})</small><div style="font-size:13px;margin-top:4px">${value}${meaning ? ' — ' + meaning : ''}</div></div>`;
+            const right = document.createElement('div');
+            const btn = document.createElement('button'); btn.className='muted-btn'; btn.textContent='Use';
+            btn.onclick = ()=>{ wordInput.value = w; fromSel.value = from; toSel.value = to; translate(); };
+            right.appendChild(btn);
+            div.appendChild(right);
+            list.appendChild(div);
+          }
+        }
+      }
+      if(!list.children.length) list.innerHTML='<div class="muted" style="padding:8px">No entries in dictionary.</div>';
+    }
+
+   
+    function saveEntry(){
+      const base = $('newWord').value.trim(); const trans = $('newTranslation').value.trim();
+      const from = $('newFrom').value, to = $('newTo').value;
+      if(!base || !trans){ alert('Both base word and translation are required'); return; }
+      DICT[from] = DICT[from] || {};
+      DICT[from][to] = DICT[from][to] || {};
+      DICT[from][to][base] = trans;
+      saveDict(); $('newWord').value=''; $('newTranslation').value='';
+      alert('Saved');
+    }
+
+    function deleteEntry(){
+      const base = $('newWord').value.trim(); const from = $('newFrom').value, to = $('newTo').value;
+      if(!base){ alert('Enter base word to delete'); return; }
+      if(DICT[from] && DICT[from][to] && DICT[from][to][base]){ delete DICT[from][to][base]; saveDict(); alert('Deleted'); $('newWord').value=''; $('newTranslation').value=''; }
+      else alert('No such entry');
+    }
+
+    function resetDict(){ if(!confirm('Reset dictionary to sample data?')) return; DICT = JSON.parse(JSON.stringify(SAMPLE)); saveDict(); }
+
+    function exportJSON(){ const data = JSON.stringify(DICT,null,2); const blob = new Blob([data],{type:'application/json'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='translator_dictionary.json'; a.click(); URL.revokeObjectURL(url); }
+
+    function importJSON(){ const input = document.createElement('input'); input.type='file'; input.accept='.json,application/json'; input.onchange = e=>{
+      const f = e.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = ev=>{
+        try{ const obj = JSON.parse(ev.target.result); DICT = obj; saveDict(); alert('Imported'); }catch(err){ alert('Invalid JSON file'); }
+      }; reader.readAsText(f);
+    }; input.click(); }
+
+    function speak(){ const text = translatedText.textContent; if(!text || text==='—') return alert('No translated text to speak'); const utter = new SpeechSynthesisUtterance(text); const voices = speechSynthesis.getVoices(); // try to pick voice based on target language
+      const lang = toSel.value; utter.lang = lang; speechSynthesis.speak(utter);
+    }
+
+   
+    function swap(){ const a = fromSel.value; fromSel.value = toSel.value; toSel.value = a; translate(); }
+
+   
+    populateLangs(); loadDict();
+    translateBtn.onclick = translate; $('add').onclick = ()=>{
+      const w = wordInput.value.trim(); const t = translatedText.textContent; if(!w || !t || t==='—') return alert('Translate a word first, then click Add'); $('newWord').value = w; $('newTranslation').value = t; $('newFrom').value = fromSel.value; $('newTo').value = toSel.value;
+    };
+    $('save').onclick = saveEntry; $('deleteEntry').onclick = deleteEntry; $('resetDict').onclick = resetDict; $('export').onclick = exportJSON; $('import').onclick = importJSON; $('speak').onclick = speak; $('swap').onclick = swap; $('clear').onclick = ()=>{ wordInput.value=''; translatedText.textContent='—'; confidence.textContent='Cleared'; };
+
+   
+    wordInput.addEventListener('keydown', e=>{ if(e.key==='Enter') translate(); });
+
+</script>
+
+</body>
+</html>
